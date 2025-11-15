@@ -21,7 +21,7 @@ A FastAPI-based service that provides AI-powered trade opportunity analysis for 
 
 1. **Clone the repository**
    ```bash
-   git clone <repository-url>
+   git clone https://github.com/yuvrajsingh833/trade-oppportunity-api.git
    cd trade-opportunities-api
    ```
 
