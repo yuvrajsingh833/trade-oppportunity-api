@@ -279,17 +279,7 @@ python -m app.main
 }
 ```
 
-## 🤝 Contributing
 
-1. Fork the repository
-2. Create feature branch
-3. Make changes
-4. Test thoroughly
-5. Submit pull request
-
-## 📄 License
-
-This project is for educational and demonstration purposes.
 
 ## 🆘 Support
 
@@ -301,4 +291,4 @@ For issues and questions:
 
 ---
 
-**Note**: This is a demonstration API. For production use, implement additional security measures, database persistence, and comprehensive error handling.
+**Created by Yuvraj Singh Rathore**
