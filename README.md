@@ -98,28 +98,6 @@ curl -X GET "http://localhost:8000/analyze/pharmaceuticals" \
 | GET | `/sectors` | List available sectors |
 | GET | `/health` | Health check |
 
-### Example Request
-
-```python
-import requests
-
-# Get token
-auth_response = requests.post(
-    "http://localhost:8000/token",
-    auth=("demo", "demo123")
-)
-token = auth_response.json()["access_token"]
-
-# Analyze sector
-headers = {"Authorization": f"Bearer {token}"}
-response = requests.get(
-    "http://localhost:8000/analyze/technology",
-    headers=headers
-)
-
-analysis = response.json()
-print(analysis["analysis"])  # Markdown report
-```
 
 ## 🎯 Available Sectors
 
