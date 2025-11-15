@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Depends, HTTPException, Request, status
+from fastapi import FastAPI, Depends, HTTPException, Request, status, Body
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from fastapi.middleware.cors import CORSMiddleware
 from datetime import datetime, timedelta
@@ -7,8 +7,6 @@ import os
 from dotenv import load_dotenv
 from typing import Optional
 from pydantic import BaseModel
-from fastapi import Body
-
 
 from .models import *
 from .auth import (
@@ -19,7 +17,6 @@ from .rate_limiter import check_rate_limit
 from .data_collector import DataCollector
 from .ai_analyzer import AIAnalyzer
 
-# Load environment variables
 load_dotenv()
 
 # Initialize FastAPI app
@@ -51,14 +48,20 @@ ai_analyzer = AIAnalyzer()
 security = HTTPBasic()
 
 
+# Pydantic model to accept JSON login payloads
+class LoginRequest(BaseModel):
+    username: str
+    password: str
+
+
 @app.on_event("startup")
 async def startup_event():
     """Initialize the application"""
     # Create demo users
     create_demo_user("demo", "demo123", "demo@tradeapi.com", "Demo User")
     create_demo_user("trader", "trader123", "trader@tradeapi.com", "Professional Trader")
-    print("🚀 Trade Opportunities API is starting up...")
-    print("📊 Demo users created:")
+    print("Trade Opportunities API is starting up...")
+    print("Demo users created:")
     print("   - Username: demo, Password: demo123")
     print("   - Username: trader, Password: trader123")
 
@@ -72,7 +75,8 @@ async def root():
         "description": "AI-powered market analysis for Indian sectors",
         "docs": "/docs",
         "endpoints": {
-            "login": "/token",
+            "login": "/login",
+            "token": "/token",
             "register": "/register",
             "analyze": "/analyze/{sector}",
             "health": "/health"
@@ -84,16 +88,43 @@ async def root():
     }
 
 
+@app.post("/login", response_model=Token)
 @app.post("/token", response_model=Token)
-async def login_for_access_token(credentials: HTTPBasicCredentials = Depends(security)):
-    """Authenticate and get access token"""
-    user = authenticate_user(credentials.username, credentials.password)
+async def login_for_access_token(
+    body: Optional[LoginRequest] = Body(None),
+    credentials: Optional[HTTPBasicCredentials] = Depends(security),
+):
+    """
+    Authenticate and return an access token.
+
+    Accepts either:
+      - JSON body: {"username": "...", "password": "..."} (Content-Type: application/json)
+      - HTTP Basic auth (Authorization header)
+
+    Prefers JSON body if provided; otherwise falls back to Basic auth.
+    """
+    # Determine username/password from JSON body or HTTP Basic
+    if body is not None and body.username and body.password:
+        username = body.username
+        password = body.password
+    elif credentials is not None:
+        username = credentials.username
+        password = credentials.password
+    else:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Missing credentials",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    user = authenticate_user(username, password)
     if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect username or password",
             headers={"WWW-Authenticate": "Bearer"},
         )
+
     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
         data={"sub": user.username}, expires_delta=access_token_expires
@@ -106,9 +137,9 @@ async def register_user(user: UserCreate):
     """Register a new user (demo purposes)"""
     try:
         success = create_demo_user(
-            user.username, 
-            user.password, 
-            user.email, 
+            user.username,
+            user.password,
+            user.email,
             user.full_name
         )
         if success:
@@ -141,55 +172,48 @@ async def analyze_sector(
 ):
     """
     Main endpoint: Analyze trade opportunities for a given sector
-    
-    **Parameters:**
-    - sector: Market sector to analyze (e.g., 'pharmaceuticals', 'technology', 'agriculture')
-    
-    **Returns:**
-    - Comprehensive markdown analysis report
     """
-    
     # Input validation
     if not sector or len(sector.strip()) < 2:
         raise HTTPException(
-            status_code=400, 
+            status_code=400,
             detail="Sector name must be at least 2 characters long"
         )
-    
+
     if len(sector) > 50:
         raise HTTPException(
             status_code=400,
             detail="Sector name too long (max 50 characters)"
         )
-    
+
     # Clean sector input
     sector = sector.strip().lower()
-    
+
     # Rate limiting check
     await check_rate_limit(request, current_user.username)
-    
+
     # Generate unique request ID
     request_id = str(uuid.uuid4())
-    
+
     # Check cache first (5 minutes cache)
     cache_key = f"{sector}_{current_user.username}"
     current_time = datetime.now()
-    
+
     if cache_key in analysis_cache:
         cached_data = analysis_cache[cache_key]
         if current_time - cached_data['timestamp'] < timedelta(minutes=5):
             cached_data['request_id'] = request_id
             cached_data['from_cache'] = True
             return cached_data
-    
+
     try:
         # Collect market data
         async with DataCollector() as collector:
             sector_data = await collector.collect_sector_data(sector)
-        
+
         # Generate AI analysis
         analysis_text = await ai_analyzer.analyze_sector(sector_data)
-        
+
         # Prepare response
         response_data = {
             "sector": sector.title(),
@@ -201,26 +225,26 @@ async def analyze_sector(
             "from_cache": False,
             "user": current_user.username
         }
-        
+
         # Cache the result
         analysis_cache[cache_key] = response_data.copy()
-        
+
         # Update session tracking
         if current_user.username not in sessions:
             sessions[current_user.username] = {
                 "requests": [],
                 "total_requests": 0
             }
-        
+
         sessions[current_user.username]["requests"].append({
             "sector": sector,
             "timestamp": current_time,
             "request_id": request_id
         })
         sessions[current_user.username]["total_requests"] += 1
-        
+
         return response_data
-        
+
     except Exception as e:
         raise HTTPException(
             status_code=500,
@@ -239,14 +263,14 @@ async def get_user_stats(current_user: User = Depends(get_current_active_user)):
         "requests": [],
         "total_requests": 0
     })
-    
+
     return {
         "username": current_user.username,
         "total_requests": user_data["total_requests"],
         "recent_requests": user_data["requests"][-10:],  # Last 10 requests
         "available_sectors": [
             "pharmaceuticals",
-            "technology", 
+            "technology",
             "agriculture",
             "banking",
             "automotive",
