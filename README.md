@@ -156,34 +156,6 @@ print(analysis["analysis"])  # Markdown report
 - Bearer token authentication
 - Secure error responses
 
-## 📈 Sample Output
-
-```markdown
-# Trade Opportunities Analysis: Technology Sector India
-
-*Analysis Date: January 15, 2024*
-
-## Executive Summary
-
-The technology sector in India presents compelling trade opportunities...
-
-## Market Overview
-- **Sector Growth**: 12.3% CAGR
-- **Market Cap**: ₹8,90,000 Cr
-- **Key Players**: TCS, Infosys, Wipro, HCL Tech
-
-## Trade Opportunities
-1. **Long-term Investment Plays**
-2. **Short-term Trading Opportunities** 
-3. **Derivative Strategies**
-
-## Risk Assessment
-- Regulatory Changes
-- Global Competition
-- Economic Cycles
-
-[Full detailed analysis continues...]
-```
 
 ## 🏗️ Architecture
 
